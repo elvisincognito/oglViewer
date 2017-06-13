@@ -35,8 +35,8 @@ from OpenGL.GLUT import *
 from OpenGL.GLU import *
 from OpenGL.arrays import vbo
 from OpenGL.GL.shaders import *
-from numpy import array
-import numpy, math
+from numpy import *
+import math
 from math import sqrt
 
 
@@ -53,7 +53,7 @@ light = True
 shade = False
 mouseLastX = None
 mouseLastY = None
-angle = 10
+#angle = 10
 newXPos = 0.0
 newYPos = 0.0
 zoomFactor = 0
@@ -76,6 +76,11 @@ modelColor = blue[0],blue[1],blue[2]
 #lightPosition = [0.0, 1200.0, 1000.0, 0.0]
 lightPosition = [0.0, 12.0, 10.0, 0.0]
 boundingBox = []
+
+angle = 0
+actOri = matrix([[1,0,0,0], [0,1,0,0], [0,0,1,0], [0,0,0,1]])
+startP = ()
+axis = [1., 0., 0.]
 
 # initialize openGL
 def initGL(width, height):
@@ -114,32 +119,23 @@ def initGeometryFromObjFile():
 	scaleFactor = 2.0/max([(x[1]-x[0]) for x in zip(*boundingBox)])
 	vertCount = 0;
 	i = 0
+
 	for vertex in objectFaces:
-		print vertex
 		vn = int(vertex[0])-1
 		nn = int(vertex[2])-1
+		i += 1
 		if objectNormals:
 			data.append(objectVertices[vn] + objectNormals[nn])
 			#data.append([objectVertices[vn][0], objectVertices[vn][1] + boundingBox[1][1], objectVertices[vn][2]] + objectNormals[nn])
 			#print data[-1]
 		else:
-			'''
-			normals = [x-y for x,y in zip(objectVertices[vn],center)]
-			l = math.sqrt(normals[0]**2 +  normals[1]**2 + normals[2]**2)
-			normals = [x/l for x in normals]
-			data.append(objectVertices[vn] + normals)
-			#data.append([objectVertices[vn][0], objectVertices[vn][1] + boundingBox[1][1], objectVertices[vn][2]] + normals)
-			'''
-			i += 1
-			#if i%3==0:
-			if True:
-				index = int(vertex[0])-1
-				#objectNormals.append()
-				#print objectVertices[index]
-				normal = normalize_v3(calNormals(objectVertices[index-2], objectVertices[index-1], objectVertices[index]))
-				data.append(objectVertices[index-2]+normal)
-				data.append(objectVertices[index-1]+normal)
-				data.append(objectVertices[index]+normal)
+			i1 = int(vertex[0])-1
+			i2 = int(vertex[1])-1
+			i3 = int(vertex[2])-1
+			normal = calNormals(objectVertices[i1], objectVertices[i2], objectVertices[i3])
+			data.append(objectVertices[i1]+normal)
+			data.append(objectVertices[i2]+normal)
+			data.append(objectVertices[i3]+normal)
 	my_vbo = vbo.VBO(array(data,'f'))
     
 # loads obj-file and return three lists with object-vertices, object-normals and object-faces
@@ -162,9 +158,10 @@ def loadOBJ(filename):
 			if check == 'f':
 				first = lines.split()[1:]
 				##if '//' not in first:
-				if True:
-				#	objectFaces.append(map(float,lines.split()[1:]))
-				#else:
+				if not checkNormal:
+					objectFaces.append(map(float,lines.split()[1:]))
+					
+				else:
 					for face in first:
 						objectFaces.append(map(float,face.split('//')))
 	for face in objectFaces:
@@ -175,18 +172,18 @@ def loadOBJ(filename):
 		if len(face) == 1:
 			face.insert(1, 0.0)
 			face.insert(2, 0.0)
-	'''if not objectNormals:
+	#if not objectNormals:
+	if False:
 		i = 0
 		for faces in objectFaces:
 			i += 1
 			if i%3==0:
 				index = int(faces[0])
 				#objectNormals.append()
-				print objectVertices[index-1]
 				objectNormals.append(calNormals(objectVertices[index-3], objectVertices[index-2], objectVertices[index-1]))
 				objectNormals.append(calNormals(objectVertices[index-3], objectVertices[index-2], objectVertices[index-1]))
 				objectNormals.append(calNormals(objectVertices[index-3], objectVertices[index-2], objectVertices[index-1]))
-				'''
+				
 	# missing normals
 	#if not checkNormal and not checkFace:
 	#	vertCount = 0
@@ -224,14 +221,18 @@ def normalize_v3(arr):
 
 # mouse events
 def mouse(button, state, x, y):
-	global doRotation, doZoom, doRotation, doTranslation, mouseLastX, mouseLastY
+	global doRotation, doZoom, doRotation, doTranslation, mouseLastX, mouseLastY, startP, angle, axis, actOri
 	mouseLastX, mouseLastY = None, None
+	r = min(WIDTH, HEIGHT)/2.0
 	# rotate object
 	if button == GLUT_LEFT_BUTTON:
 		if state == GLUT_DOWN:
 			doRotation = True
+			startP = projectOnSphere(x,y,r)
 		if state == GLUT_UP:
 			doRotation = False
+			actOri = actOri*rotate(angle, axis)
+			angle = 0
 	# zoom
 	if button == GLUT_MIDDLE_BUTTON:
 		if state == GLUT_DOWN:
@@ -247,7 +248,7 @@ def mouse(button, state, x, y):
 
 # mouse motion
 def mouseMotion(x,y):
-	global angle, doZoom, doRotation, doTranslation, scaleFactor, center, mouseLastX, mouseLastY, rotateX, rotateY, sceneWidth, sceneHeight, newXPos, newYPos, zoomFactor
+	global angle, doZoom, doRotation, doTranslation, scaleFactor, center, mouseLastX, mouseLastY, rotateX, rotateY, sceneWidth, sceneHeight, newXPos, newYPos, zoomFactor, actOri, axis
 	xDiff = 0
 	yDiff = 0
 	# calc difference between coordinates
@@ -257,10 +258,10 @@ def mouseMotion(x,y):
 		yDiff = y - mouseLastY
 	# rotate
 	if doRotation:
-		if xDiff != 0:
-			rotateY += xDiff
-		if yDiff != 0:
-			rotateX += yDiff
+		r = min(WIDTH, HEIGHT)/2.0
+		moveP = projectOnSphere(x,y,r)
+		angle = arccos(dot(startP, moveP))
+		axis = cross(startP, moveP)
 	global sceneWidth, sceneHeight
 	# zoom
 	if doZoom:
@@ -417,15 +418,17 @@ def display():
 	# Translate
 	glTranslate(newXPos,newYPos,0.0)
 	# Rotate
-	glRotate(rotateX, 1, 0, 0)
-	glRotate(rotateY, 0, 1, 0)
-	glRotate(rotateZ, 0, 0, 1)
+	#glRotate(rotateX, 1, 0, 0)
+	#glRotate(rotateY, 0, 1, 0)
+	#glRotate(rotateZ, 0, 0, 1)
+	
+	###
+	glMultMatrixf(actOri*rotate(angle, axis))
+	
 	# Scale
 	glScale(scaleFactor, scaleFactor, scaleFactor)
 	# move to center
 	glTranslate(-center[0], -center[1], -center[2])
-	
-	
 	
 	
 	# show object as wires
@@ -483,6 +486,27 @@ def display():
 	glDisableClientState(GL_NORMAL_ARRAY)
 	#swap buffer
 	glutSwapBuffers() 
+
+def rotate(angle, axis):
+	c,mc = cos(angle), 1-cos(angle)
+	s = sin(angle)
+	l = sqrt(dot(array(axis), array(axis)))
+	x,y,z = array(axis)/l
+	
+	r = matrix(
+		[ [x*x*mc+c, x*y*mc-z*s, x*z*mc+y*s, 0],
+		  [x*y*mc+z*s, y*y*mc+c, y*z*mc-x*s, 0],
+		  [x*z*mc-y*s, y*z*mc+x*s, z*z*mc+c, 0],
+		  [0,0,0,1] ]
+	)
+	return r.transpose()
+
+def projectOnSphere(x, y, r):
+	x,y = x-WIDTH/2.0, HEIGHT/2.0-y
+	a = min(r*r, x*x, y*y)
+	z = sqrt(r*r-a)
+	l = sqrt(x*x+y*y+z*z)
+	return x/l, y/l, z/l
 
 # Init Window, register Callback functions, init geometry, start processing
 def main():
