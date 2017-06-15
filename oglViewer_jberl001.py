@@ -26,8 +26,6 @@ linke Muastaste:	rotieren
 mittlere Maustaste:	zoom
 rechte Maustaste:	verschieben
 
-
-Die Normalen Stimmen noch nicht ganz, vielleicht haben Sie da bei der Abnahme einen Tipp fuer mich ^^
 '''
 
 from OpenGL.GL import *
@@ -38,7 +36,6 @@ from OpenGL.GL.shaders import *
 from numpy import *
 import math
 from math import sqrt
-
 
 # globals
 my_vbo = None
