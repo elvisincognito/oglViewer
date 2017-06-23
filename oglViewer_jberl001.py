@@ -26,6 +26,8 @@ linke Muastaste:	rotieren
 mittlere Maustaste:	zoom
 rechte Maustaste:	verschieben
 
+
+Die Normalen Stimmen noch nicht ganz, vielleicht haben Sie da bei der Abnahme einen Tipp fuer mich ^^
 '''
 
 from OpenGL.GL import *
@@ -36,6 +38,7 @@ from OpenGL.GL.shaders import *
 from numpy import *
 import math
 from math import sqrt
+
 
 # globals
 my_vbo = None
@@ -69,7 +72,7 @@ yellow = (1.0,1.0,0.0,0.0)
 red = (1.0,0.0,0.0,0.0)
 modelColor = blue[0],blue[1],blue[2]
 # light
-#lightPosition = [0.0, 120000.0, 10000.0, 0.0]
+#lightPosition = [0.0, 1200.0, 1000.0, 0.0]
 lightPosition = [0.0, 12.0, 10.0, 0.0]
 boundingBox = []
 angle = 0
@@ -108,22 +111,39 @@ def initGeometryFromObjFile():
 	# scale factor
 	scaleFactor = 2.0/max([(x[1]-x[0]) for x in zip(*boundingBox)])
 	i = 0
-	for vertex in objectFaces:
-		vn = int(vertex[0])-1
-		nn = int(vertex[2])-1
-		i += 1
-		if objectNormals:
+	
+	if objectNormals:
+		for vertex in objectFaces:
+			vn = int(vertex[0])-1
+			nn = int(vertex[2])-1
+			i += 1
 			data.append(objectVertices[vn] + objectNormals[nn])
-		else:
+	else:
+		idx = 0
+		while idx<len(objectVertices):
+			objectNormals.append([0,0,0])
+			idx = idx+1
+
+		for vertex in objectFaces:			
 			i1 = int(vertex[0])-1
 			i2 = int(vertex[1])-1
 			i3 = int(vertex[2])-1
-			normal = calNormals(objectVertices[i1], objectVertices[i2], objectVertices[i3])
-			data.append(objectVertices[i1]+normal)
-			data.append(objectVertices[i2]+normal)
-			data.append(objectVertices[i3]+normal)
+			p1 = objectVertices[i1]
+			p2 = objectVertices[i2]
+			p3 = objectVertices[i3]
+			c1 = subtract(p2, p1)
+			c2 = subtract(p3, p1)
+			normal = cross(c1, c2)
+			objectNormals[i1] = add(objectNormals[i1], normal).tolist()
+			objectNormals[i2] = add(objectNormals[i2], normal).tolist()
+			objectNormals[i3] = add(objectNormals[i3], normal).tolist()
+		for vertex in objectFaces:
+			for idx in vertex:
+				i = int(idx)-1
+				data.append([objectVertices[i], objectNormals[i]])
+				
 	my_vbo = vbo.VBO(array(data,'f'))
-   
+    
 # loads obj-file and return three lists with object-vertices, object-normals and object-faces
 def loadOBJ(filename):
 	objectVertices = [] 
@@ -167,6 +187,12 @@ def calNormals(p1, p2, p3):
 	Nz = (U[0]*V[1]) - (U[1]*V[0])
 	vn = [Nx, Ny, Nz]
 	return vn
+
+
+def realNormals():
+	c1 = np.subtrac(p2, p3)
+	c2 = np.subtrac(p3, p1)
+	cross = np.cross(c1, c2)
 
 def normalize_v3(arr):
 	#print arr
